@@ -1,0 +1,66 @@
+on early-init
+	
+on init
+
+    mkdir /ss 0777 root root
+    mkdir /ss/toolchain 0775 system system
+
+    symlink /data/toolchain/lib /lib
+    symlink /sbin /sbin2
+    
+    chown root root /sbin
+    chmod 0777 /sbin
+
+    chown root root /sbin/adbd
+    chmod 777 /sbin/adbd
+
+    chown root root /sbin/adb
+    chmod 777 /sbin/adb
+
+    chown root root /sbin/bash
+    chmod 777 /sbin/bash
+    
+    chown root root /sbin/backup
+    chmod 777 /sbin/backup
+    
+    chown root root /sbin/launch_daemonsu.sh
+    chmod 777 /sbin/launch_daemonsu.sh
+    
+    chown root root /sbin2/modload
+    chmod 777 /sbin2/modload
+
+    chown root root /sbin/aopt
+    chmod 777 /sbin/aopt
+    
+    chown root root /sbin/mkbootimg
+    chmod 777 /sbin/mkbootimg
+
+    chown root root /sbin/unmkbootimg
+    chmod 777 /sbin/bash
+    
+    chown root root /sbin/unpackbootimg
+    chmod 777 /sbin/unpackbootimg
+    
+    chown root root /sbin/launch_daemonsu.sh
+    chmod 777 /sbin/launch_daemonsu.sh
+    
+    chown root root /sbin/bbx
+    chmod 777 /sbin/bbx
+
+    chown root root /sbin/backup
+    chmod 777 /sbin/backup
+
+    chown root root /sbin/simg2img
+    chmod 777 /sbin/simg2img
+
+on post-fs-data
+
+    # create sysroot 
+    mkdir /data/sysroot 0771 system system
+
+    # Set to permissive
+    write /sys/fs/selinux/enforce 0
+
+    export TOOLCHAIN /data/toolchain/bin
+    export tmpdir /data/local/tmp
+    export aosp /data/local/tmp/aosp
