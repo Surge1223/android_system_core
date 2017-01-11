@@ -1,0 +1,189 @@
+#!/sbin/bbx sh
+PATH=/sbin:/system/bin:/system/xbin:/data/local/tmp:/data/toolchain/bin
+LD_LIBRARY_PATH=/vendor/lib:/system/lib:/data/toolchain/lib
+bbx=/sbin/bbx
+xb=/system/xbin/busybox
+echo "0" > /proc/sys/kernel/dmesg_restrict 
+echo "0" > /proc/sys/kernel/kptr_restrict
+echo "<1>Pure NEXUS optimizations begin" > /dev/kmsg
+
+$bbx mount -o remount,rw /system
+$bbx mount -o remount,rw /
+mount -o remount,rw / /
+mount -o remount,rw rootfs /
+mount -o remount,rw /system
+mount -o remount,rw /data
+
+chmod 04755 $xb
+chown root.shell $xb
+chmod 04755 $bbx
+chown root.shell $bbx
+
+
+OPEN_RW()
+{
+        $bbx mount -o remount,rw /;
+        $bbx mount -o remount,rw /system;
+}
+OPEN_RW;
+
+sleep 5;
+
+# Run init.d scripts
+$bbx sh /system/etc/init.d/*;
+
+sleep 5;
+OPEN_RW;
+
+# Symlink
+if [ ! -e /cpufreq ]; then
+	$bbx ln -s /sys/devices/system/cpu/cpu0/cpufreq /cpufreq;
+	$bbx ln -s /sys/devices/system/cpu/cpufreq/ /cpugov;
+fi;
+
+# Cleaning
+$bbx rm -rf /cache/lost+found/* 2> /dev/null;
+$bbx rm -rf /data/lost+found/* 2> /dev/null;
+$bbx rm -rf /data/tombstones/* 2> /dev/null;
+
+CRITICAL_PERM_FIX()
+{
+	# critical Permissions fix
+	$bbx chown -R system:system /data/anr;
+	$bbx chown -R root:root /tmp;
+	$bbx chown -R root:root /res;
+	$bbx chown -R root:root /sbin;
+	$bbx chown -R root:root /lib;
+	$bbx chmod -R 777 /tmp/;
+	$bbx chmod -R 775 /res/;
+	$bbx chmod -R 06755 /sbin/ext/;
+	$bbx chmod -R 0777 /data/anr/;
+	$bbx chmod -R 0400 /data/tombstones;
+	$bbx chmod 06755 /sbin/bbx;
+}
+CRITICAL_PERM_FIX;
+
+# oom and mem perm fix
+$bbx chmod 666 /sys/module/lowmemorykiller/parameters/cost;
+$bbx chmod 666 /sys/module/lowmemorykiller/parameters/adj;
+$bbx chmod 666 /sys/module/lowmemorykiller/parameters/minfree;
+
+# Make sure we own the device nodes
+$bbx chown system /sys/devices/system/cpu/cpu0/cpufreq/*;
+$bbx chown system /sys/devices/system/cpu/cpu1/online;
+$bbx chown system /sys/devices/system/cpu/cpu2/online;
+$bbx chown system /sys/devices/system/cpu/cpu3/online;
+$bbx chmod 666 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor;
+$bbx chmod 666 /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq;
+$bbx chmod 666 /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq;
+$bbx chmod 444 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq;
+$bbx chmod 444 /sys/devices/system/cpu/cpu0/cpufreq/stats/*;
+$bbx chmod 666 /sys/devices/system/cpu/cpu1/online;
+$bbx chmod 666 /sys/devices/system/cpu/cpu2/online;
+$bbx chmod 666 /sys/devices/system/cpu/cpu3/online;
+$bbx chmod 666 /sys/module/msm_thermal/parameters/*;
+$bbx chmod 666 /sys/module/msm_thermal/core_control/enabled;
+$bbx chown -R root:root /data/property;
+$bbx chmod -R 0700 /data/property;
+
+$bbx chown -R root:root /tmp
+$bbx chown -R root:root /sbin
+$bbx chown -R root:root /lib
+$bbx chmod -R 777 /tmp/
+$bbx chmod -R 06755 /sbin/
+$bbx chmod -R 0777 /data/anr/
+$bbx chmod -R 0400 /data/tombstones
+$bbx chmod 06755 /sbin/busybox
+
+chmod 755 /sbin/adbd
+chown root.root /sbin/adbd
+chmod 755 $bbx
+chown root.shell $bbx
+$bbx chmod 777 /system/etc/init.d/*
+chmod 0755 /sbin/adbd
+chown root.root /sbin/adbd
+chmod 755 /system/lib/modules
+chmod 644 /system/lib/modules/*.ko
+
+			# reset permissions
+			$bbx chmod -R 755 /sbin/*
+			$bbx chmod 777 /sbin/adbd
+			$bbx chmod 755 /charger
+			$bbx chmod 755 /modload.sh
+			$bbx chmod 644 /default.prop
+			$bbx chmod 755 /*.rc
+			$bbx chmod 755 /*.sh
+			
+echo "<1>Finished purifying the system!" > /dev/kmsg	
+
+sed -i "s/xbin/xbin:\/data\/toolchain\/bin:\/data\/local\/tmp /" /init.environ.rc
+
+
+sed -i "s/write \/proc\/sys\/kernel\/kptr_restrict 2/write \/proc\/sys\/kernel\/kptr_restrict 0/" /init.rc
+
+sed -i "s/mkdir \/mnt 0775 root system/mkdir tmpinit 0777 root root \n mkdir \/mnt 0775 root system /" /init.rc
+
+sed -i "s/xbin/xbin:\/data\/local\/toolchain\/bin:\/data\/local\/tmp /" /init.environ.rc
+
+setenforce 0
+mkdir -p /sdcard/log
+dmesg >/sdcard/log/startup.log
+cat /proc/kallsyms >/sdcard/log/kallsyms.txt
+
+
+cat > /data/local/tmp/path.sh << EOF
+#
+# Copyright 2015 The Purified Open-Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#!/system/bin/sh
+
+
+export PATH=$PATH:/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin:/data/local/tmp:/data/toolchain/bin:/tmp/bin
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vendor/lib:/system/lib:/data/toolchain/lib:/lib
+
+SYSROOT=/data/toolchain
+if [ ! -L "$ROOT_BIN" ]; then
+    /system/xbin/busybox mount -t rootfs -o remount,rw rootfs;
+/system/xbin/busybox mount -t rootfs -o remount,rw /system;
+    ln -s /system/bin /bin
+ln -s $SYSROOT/sysroot/lib /lib
+    /system/xbin/busybox mount -t rootfs -o remount,ro rootfs;
+fi
+EOF
+
+$bbx chmod 777 /data/local/tmp/path.sh
+. /data/local/tmp/path.sh
+$bbx mount -o remount,rw /system
+$bbx mount -o remount,rw /
+mount -o remount,rw / /
+mount -o remount,rw rootfs /
+mount -o remount,rw /system
+mount -o remount,rw /data
+
+$bbx chown -R root:root /tmp
+$bbx chown -R root:root /sbin
+$bbx chown -R root:root /lib
+$bbx chmod -R 777 /tmp/
+$bbx chmod -R 06755 /sbin/
+$bbx chmod -R 0777 /data/anr/
+$bbx chmod -R 0400 /data/tombstones
+$bbx chmod 06755 /sbin/busybox
+echo "11" > /data/local/tmp/works;
+
+OPEN_RW;
+
+# Fix critical perms again after init.d mess
+	CRITICAL_PERM_FIX;
+$bbx sync
