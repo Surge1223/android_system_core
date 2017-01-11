@@ -24,6 +24,16 @@ LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)/init
 include $(BUILD_PREBUILT)
 
 #######################################
+# init.container.rc
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := init.container.rc
+LOCAL_SRC_FILES := $(LOCAL_MODULE)
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(ANDROID_PRODUCT_OUT)/root
+include $(BUILD_PREBUILT)
+
+#######################################
 # asan.options
 ifneq ($(filter address,$(SANITIZE_TARGET)),)
 

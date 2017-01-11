@@ -1,0 +1,33 @@
+on early-init
+	
+on init
+
+    chown root root /sbin
+    chmod 0777 /sbin
+
+    chown root root /sbin/adbd
+    chmod 777 /sbin/adbd
+
+    chown root root /sbin/adb
+    chmod 777 /sbin/adb
+
+    chown root root /sbin/bash
+    chmod 777 /sbin/bash
+    
+    chown root root /sbin/bbx
+    chmod 777 /sbin/bbx
+
+    chown root root /sbin/simg2img
+    chmod 777 /sbin/simg2img
+
+on post-fs-data
+
+    # create sysroot 
+    mkdir /data/sysroot 0771 system system
+
+    # Set to permissive
+    write /sys/fs/selinux/enforce 0
+
+    export TOOLCHAIN /data/toolchain/bin
+    export tmpdir /data/local/tmp
+
