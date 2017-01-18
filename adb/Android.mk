@@ -8,7 +8,12 @@ LOCAL_PATH:= $(call my-dir)
 adb_host_sanitize :=
 adb_target_sanitize :=
 
+FIND_HOSTOS := $(shell uname -s)
+HOST_NAME := $(shell echo $(FIND_HOSTOS) |sed -e s/L/l/ |sed -e s/D/d/ |sed s/W/w/ )
 adb_version := $(shell git -C $(LOCAL_PATH) rev-parse --short=12 HEAD 2>/dev/null)-android
+ifeq ($(filter arm x86 mips, arm64 $(TARGET_ARCH)),)
+    adb_version := android-$(PLATFORM_VERSION) $(TARGET_ARCH)
+endif
 
 ADB_COMMON_CFLAGS := \
     -Wall -Wextra -Werror \
@@ -25,6 +30,65 @@ ADB_COMMON_darwin_CFLAGS := \
     -std=c++14 \
     -Wexit-time-destructors \
 
+ADB_COMMON_TARGET_CFLAGS := \
+    -DALLOW_ADBD_NO_AUTH=1 \
+    -DALLOW_ADBD_DISABLE_VERITY=1 \
+    -DALLOW_ADBD_ROOT=1 \
+    -fpermissive \
+    -std=gnu++1y \
+    -Wwrite-strings \
+    -Wsign-compare \
+    -Wno-sign-compare \
+    -Wno-non-virtual-dtor \
+    -fno-exceptions -fno-rtti -Os \
+    -D_GNU_SOURCE \
+    -DHAVE_PTHREADS \
+    -DHAVE_SCHED_H \
+    -DHAVE_SYS_UIO_H \
+    -DHAVE_IOCTL \
+    -DHAVE_TM_GMTOFF \
+    -DANDROID_SMP=1  \
+    -DHAVE_ENDIAN_H \
+    -DHAVE_POSIX_FILEMAP \
+    -DHAVE_OFF64_T \
+    -DHAVE_ENDIAN_H \
+    -DHAVE_SCHED_H \
+     -DHAVE_LITTLE_ENDIAN_H \
+     -D__ANDROID__ \
+     -D_ANDROID_CONFIG_H \
+
+ADB_STATIC_LIBRARIES := \
+    libbase \
+    libcrypto_static \
+    libcrypto_utils_static \
+    libcutils \
+    libutils \
+    libziparchive \
+    libm \
+    libc \
+    libz \
+    libc++_static
+
+ADB_TARGET_INCLUDES := \
+    $(LOCAL_PATH)/include \
+    $(LOCAL_PATH)/tmp/include \
+    system/core/base/include \
+    system/core/libutils \
+    system/core/include \
+    system/core/liblog \
+    system/core/libcutils \
+    system/core/libcrypto_utils/include \
+    system/core/libcrypto_utils \
+    external/boringssl/src/include \
+    external/boringssl/src/include/crypto \
+    external/libpng \
+    external/libcxx/include \
+    external/expat \
+    external/zlib \
+    bionic/libc/include \
+    external/openssl/include \
+    system/core/libziparchive \
+    system/extras/ext4_utils \
 # Define windows.h and tchar.h Unicode preprocessor symbols so that
 # CreateFile(), _tfopen(), etc. map to versions that take wchar_t*, breaking the
 # build if you accidentally pass char*. Fix by calling like:
@@ -77,6 +141,10 @@ LIBADB_darwin_CFLAGS := \
 
 LIBADB_windows_CFLAGS := \
     $(ADB_COMMON_windows_CFLAGS) \
+LIBADB_TARGET_CFLAGS := \
+    $(ADB_COMMON_TARGET_CFLAGS) \
+    -DADB_HOST_ON_TARGET=1 \
+    -Wno-missing-field-initializers \
 
 LIBADB_darwin_SRC_FILES := \
     get_my_path_darwin.cpp \
@@ -84,6 +152,11 @@ LIBADB_darwin_SRC_FILES := \
     usb_osx.cpp \
 
 LIBADB_linux_SRC_FILES := \
+    get_my_path_linux.cpp \
+    sysdeps_unix.cpp \
+    usb_linux.cpp \
+
+LIBADB_TARGET_SRC_FILES := \
     get_my_path_linux.cpp \
     sysdeps_unix.cpp \
     usb_linux.cpp \
@@ -116,7 +189,24 @@ include $(BUILD_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libadb
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MULTILIB := both
+LOCAL_MODULE_STEM_32 := $(LOCAL_MODULE)
+LOCAL_MODULE_STEM_64 := $(LOCAL_MODULE)64
+LOCAL_CLANG := false
+LOCAL_CFLAGS := $(LIBADB_TARGET_CFLAGS) -DADB_HOST=1
+LOCAL_SRC_FILES := \
+    $(LIBADB_TARGET_SRC_FILES) \
+    adb_auth_host.cpp 
+    
+LOCAL_C_INCLUDS := $(ADB_TARGET_INCLUDES)
+# Even though we're building a static library (and thus there's no link step for
+# this to take effect), this adds the includes to our path.
+LOCAL_STATIC_LIBRARIES := libcrypto_utils_static libcrypto_static libbase 
+include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := libadb
+LOCAL_MODULE_HOST_OS := $(HOST_NAME)
 LOCAL_CFLAGS := $(LIBADB_CFLAGS) -DADB_HOST=1
 LOCAL_CFLAGS_windows := $(LIBADB_windows_CFLAGS)
 LOCAL_CFLAGS_linux := $(LIBADB_linux_CFLAGS)
@@ -133,7 +223,7 @@ LOCAL_SANITIZE := $(adb_host_sanitize)
 
 # Even though we're building a static library (and thus there's no link step for
 # this to take effect), this adds the includes to our path.
-LOCAL_STATIC_LIBRARIES := libcrypto_static libbase
+LOCAL_STATIC_LIBRARIES := libcrypto_utils_static libcrypto_static libbase 
 
 LOCAL_C_INCLUDES_windows := development/host/windows/usb/api/
 LOCAL_MULTILIB := first
@@ -162,7 +252,7 @@ include $(BUILD_NATIVE_TEST)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libdiagnose_usb
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := $(HOST_NAME)
 LOCAL_CFLAGS := $(LIBADB_CFLAGS)
 LOCAL_SRC_FILES := diagnose_usb.cpp
 # Even though we're building a static library (and thus there's no link step for
@@ -175,7 +265,7 @@ include $(BUILD_HOST_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := adb_test
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := $(HOST_NAME)
 LOCAL_CFLAGS := -DADB_HOST=1 $(LIBADB_CFLAGS)
 LOCAL_CFLAGS_windows := $(LIBADB_windows_CFLAGS)
 LOCAL_CFLAGS_linux := $(LIBADB_linux_CFLAGS)
@@ -216,7 +306,7 @@ include $(BUILD_HOST_NATIVE_TEST)
 # adb device tracker (used by ddms) test tool
 # =========================================================
 
-ifeq ($(HOST_OS),linux)
+ifeq ($(HOST_NAME),linux)
 include $(CLEAR_VARS)
 LOCAL_MODULE := adb_device_tracker_test
 LOCAL_CFLAGS := -DADB_HOST=1 $(LIBADB_CFLAGS)
@@ -273,7 +363,7 @@ LOCAL_CFLAGS_darwin := \
 
 LOCAL_MODULE := adb
 LOCAL_MODULE_TAGS := debug
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := $(HOST_NAME)
 
 LOCAL_SANITIZE := $(adb_host_sanitize)
 LOCAL_STATIC_LIBRARIES := \
@@ -295,6 +385,61 @@ LOCAL_CXX_STL := libc++_static
 LOCAL_SHARED_LIBRARIES :=
 
 include $(BUILD_HOST_EXECUTABLE)
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := \
+    adb.cpp \
+    adb_auth.cpp \
+    adb_io.cpp \
+    adb_listeners.cpp \
+    adb_trace.cpp \
+    adb_utils.cpp \
+    fdevent.cpp \
+    sockets.cpp \
+    get_my_path_linux.cpp \
+    transport.cpp \
+    transport_local.cpp \
+    transport_usb.cpp \
+    adb_client.cpp \
+    client/main.cpp \
+    console.cpp \
+    commandline.cpp \
+    diagnose_usb.cpp \
+    file_sync_client.cpp \
+    line_printer.cpp \
+    services.cpp \
+    shell_service_protocol.cpp \
+    adb_auth_host.cpp \
+    sysdeps_unix.cpp \
+    usb_linux.cpp \
+
+LOCAL_CFLAGS += \
+    $(ADB_COMMON_CFLAGS) \
+    $(ADB_COMMON_TARGET_CFLAGS) \
+    -D_GNU_SOURCE \
+    -DADB_LOCAL_HOST=1 \
+    -DADB_HOST=1 \
+    -DADB_HOST_ON_TARGET=1 \
+    -Wall \
+    -Wno-unused-parameter \
+    -D_XOPEN_SOURCE \
+
+LOCAL_MODULE := adb
+LOCAL_MULTILIB := both
+LOCAL_MODULE_STEM_64 := adb64
+LOCAL_MODULE_PATH_32 := $(ANDROID_PRODUCT_OUT)/system/bin
+LOCAL_MODULE_PATH_64 := $(ANDROID_PRODUCT_OUT)/system/bin
+LOCAL_STATIC_LIBRARIES := $(ADB_STATIC_LIBRARIES) 
+LOCAL_WHOLE_STATIC_LIBRARIES := libbase
+LOCAL_CXX_STL := libc++_static
+LOCAL_C_INCLUDS:= $(ADB_TARGET_INCLUDES)
+LOCAL_FORCE_STATIC_EXECUTABLE := true
+LOCAL_MODULE_CLASS := EXECUTABLES
+LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_SBIN_UNSTRIPPED)
+LOCAL_MODULE_TAGS := optional debug eng
+aoptLdLibs := -lc -lgcc -ldl -lz -lm
+LOCAL_LDFLAGS += -static 
+include $(BUILD_EXECUTABLE)
 
 $(call dist-for-goals,dist_files sdk win_sdk,$(LOCAL_BUILT_MODULE))
 ifdef HOST_CROSS_OS
@@ -302,6 +447,37 @@ ifdef HOST_CROSS_OS
 $(call dist-for-goals,win_sdk,$(ALL_MODULES.host_cross_adb.BUILT))
 endif
 
+libcrypto_utils_prepare := 
+
+mktmp := $(shell mkdir -vp $(addprefix $(LOCAL_PATH)/, tmp))
+getit := $(shell curl https://chromium.googlesource.com/aosp/platform/system/core/+archive/master/libcrypto_utils.tar.gz -o  $(LOCAL_PATH)/libcrypto_utils.tar.gz)
+untgzit := $(shell tar -xvf $(LOCAL_PATH)/libcrypto_utils.tar.gz -C $(LOCAL_PATH)/tmp)
+
+ifneq ($(libcrypto_utils_prepare),)
+$(shell rm $(LOCAL_PATH)/libcrypto_utils.tar.gz)
+$(shell rm -rf $(LOCAL_PATH)/tmp)
+libcrypto_utils_prepare := $(mktmp) $(getit) $(untgzit)
+endif
+
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := libcrypto_utils_static
+LOCAL_MODULE_HOST_OS := $(HOST_OS)
+LOCAL_SRC_FILES := tmp/android_pubkey.c
+LOCAL_CFLAGS := -Wall -Werror -Wextra -std=c99
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/tmp/include/
+LOCAL_EXPORT_C_INCLUDES := $(LOCAL_C_INCLUDES)
+LOCAL_STATIC_LIBRARIES := libcrypto_static
+include $(BUILD_HOST_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := libcrypto_utils_static
+LOCAL_SRC_FILES := tmp/android_pubkey.c
+LOCAL_CFLAGS := -Wall -Werror -Wextra -std=c99
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/tmp/include/
+LOCAL_EXPORT_C_INCLUDES := $(LOCAL_C_INCLUDES)
+LOCAL_STATIC_LIBRARIES := libcrypto_static
+include $(BUILD_STATIC_LIBRARY)
 
 # adbd device daemon
 # =========================================================
@@ -322,7 +498,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_CFLAGS := \
     $(ADB_COMMON_CFLAGS) \
-    $(ADB_COMMON_linux_CFLAGS) \
+    $(ADB_COMMON_TARGET_CFLAGS) \
     -DADB_HOST=0 \
     -D_GNU_SOURCE \
     -Wno-deprecated-declarations \
@@ -339,12 +515,13 @@ LOCAL_MODULE := adbd
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT_SBIN)
 LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_SBIN_UNSTRIPPED)
+LOCAL_C_INCLUDS:= $(ADB_TARGET_INCLUDES)
 LOCAL_C_INCLUDES += system/extras/ext4_utils
 
 LOCAL_SANITIZE := $(adb_target_sanitize)
 LOCAL_STATIC_LIBRARIES := \
+  $(ADB_STATIC_LIBRARIES) \
     libadbd \
-    libbase \
     libfs_mgr \
     libfec \
     libfec_rs \
@@ -353,9 +530,10 @@ LOCAL_STATIC_LIBRARIES := \
     libmincrypt \
     libext4_utils_static \
     libsquashfs_utils \
-    libcutils \
-    libbase \
-    libcrypto_static \
     libminijail
 
+LOCAL_SRC_FILES := $(LOCAL_SRC_FILES )
+LOCAL_MODULE_TAGS := optional debug eng
+aoptLdLibs := -lc -lgcc -ldl -lz -lm
+LOCAL_LDFLAGS += -static 
 include $(BUILD_EXECUTABLE)
