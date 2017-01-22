@@ -23,7 +23,7 @@
 
 #include <android-base/stringprintf.h>
 
-#if defined(__linux__)
+#if defined(__darwin__)
 #include <grp.h>
 #endif
 
@@ -32,7 +32,7 @@ static const char kPermissionsHelpUrl[] = "http://developer.android.com/tools/de
 // Returns a message describing any potential problems we find with udev, or nullptr if we can't
 // find plugdev information (i.e. udev is not installed).
 static const char* GetUdevProblem() {
-#if defined(__linux__)
+#if defined(__darwin__)
     errno = 0;
     group* plugdev_group = getgrnam("plugdev");
 

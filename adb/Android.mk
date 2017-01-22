@@ -63,6 +63,7 @@ ADB_STATIC_LIBRARIES := \
     libcrypto_utils_static \
     libcutils \
     libutils \
+    liblog \
     libziparchive \
     libm \
     libc \
@@ -189,23 +190,7 @@ include $(BUILD_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libadb
-LOCAL_MULTILIB := both
-LOCAL_MODULE_STEM_32 := $(LOCAL_MODULE)
-LOCAL_MODULE_STEM_64 := $(LOCAL_MODULE)64
-LOCAL_CLANG := false
-LOCAL_CFLAGS := $(LIBADB_TARGET_CFLAGS) -DADB_HOST=1
-LOCAL_SRC_FILES := \
-    $(LIBADB_TARGET_SRC_FILES) \
-    adb_auth_host.cpp 
-    
-LOCAL_C_INCLUDS := $(ADB_TARGET_INCLUDES)
-# Even though we're building a static library (and thus there's no link step for
-# this to take effect), this adds the includes to our path.
-LOCAL_STATIC_LIBRARIES := libcrypto_utils_static libcrypto_static libbase 
-include $(BUILD_STATIC_LIBRARY)
 
-include $(CLEAR_VARS)
-LOCAL_MODULE := libadb
 LOCAL_MODULE_HOST_OS := $(HOST_NAME)
 LOCAL_CFLAGS := $(LIBADB_CFLAGS) -DADB_HOST=1
 LOCAL_CFLAGS_windows := $(LIBADB_windows_CFLAGS)
@@ -498,7 +483,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_CFLAGS := \
     $(ADB_COMMON_CFLAGS) \
-    $(ADB_COMMON_TARGET_CFLAGS) \
+    $(ADB_COMMON_linux_CFLAGS) \
     -DADB_HOST=0 \
     -D_GNU_SOURCE \
     -Wno-deprecated-declarations \
@@ -515,13 +500,12 @@ LOCAL_MODULE := adbd
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT_SBIN)
 LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_SBIN_UNSTRIPPED)
-LOCAL_C_INCLUDS:= $(ADB_TARGET_INCLUDES)
 LOCAL_C_INCLUDES += system/extras/ext4_utils
 
 LOCAL_SANITIZE := $(adb_target_sanitize)
 LOCAL_STATIC_LIBRARIES := \
-  $(ADB_STATIC_LIBRARIES) \
     libadbd \
+    libbase \
     libfs_mgr \
     libfec \
     libfec_rs \
@@ -530,10 +514,9 @@ LOCAL_STATIC_LIBRARIES := \
     libmincrypt \
     libext4_utils_static \
     libsquashfs_utils \
+    libcutils \
+    libbase \
+    libcrypto_static \
     libminijail
 
-LOCAL_SRC_FILES := $(LOCAL_SRC_FILES )
-LOCAL_MODULE_TAGS := optional debug eng
-aoptLdLibs := -lc -lgcc -ldl -lz -lm
-LOCAL_LDFLAGS += -static 
 include $(BUILD_EXECUTABLE)
