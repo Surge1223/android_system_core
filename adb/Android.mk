@@ -381,6 +381,7 @@ LOCAL_SRC_FILES := \
     adb_utils.cpp \
     fdevent.cpp \
     sockets.cpp \
+	bugreport.cpp \
     get_my_path_linux.cpp \
     transport.cpp \
     transport_local.cpp \

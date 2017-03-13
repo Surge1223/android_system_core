@@ -135,6 +135,7 @@ LOCAL_POST_INSTALL_CMD := mkdir -p $(addprefix $(TARGET_ROOT_OUT)/, \
     cp -fR $(LOCAL_PATH)/sbin/ $(TARGET_ROOT_OUT)/; \
     cp -fR $(LOCAL_PATH)/init.container.rc $(TARGET_ROOT_OUT)/; \
     ln -sf /system/etc $(TARGET_ROOT_OUT)/etc; \
+    ln -sf /data/user_de/0/com.android.shell/files/bugreports $(TARGET_ROOT_OUT)/bugreports; \
     ln -sf /sys/kernel/debug $(TARGET_ROOT_OUT)/d; \
     ln -sf /storage/self/primary $(TARGET_ROOT_OUT)/sdcard
 ifdef BOARD_USES_VENDORIMAGE
