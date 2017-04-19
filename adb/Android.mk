@@ -381,7 +381,7 @@ LOCAL_SRC_FILES := \
     adb_utils.cpp \
     fdevent.cpp \
     sockets.cpp \
-	bugreport.cpp \
+    bugreport.cpp \
     get_my_path_linux.cpp \
     transport.cpp \
     transport_local.cpp \
@@ -432,24 +432,23 @@ ifdef HOST_CROSS_OS
 # Archive adb.exe for win_sdk build.
 $(call dist-for-goals,win_sdk,$(ALL_MODULES.host_cross_adb.BUILT))
 endif
-
-libcrypto_utils_prepare := 
-
+libcrypto_utils_prepare :=
 mktmp := $(shell mkdir -vp $(addprefix $(LOCAL_PATH)/, tmp))
 getit := $(shell curl https://chromium.googlesource.com/aosp/platform/system/core/+archive/master/libcrypto_utils.tar.gz -o  $(LOCAL_PATH)/libcrypto_utils.tar.gz)
 untgzit := $(shell tar -xvf $(LOCAL_PATH)/libcrypto_utils.tar.gz -C $(LOCAL_PATH)/tmp)
+RMDIRS := $(shell rm $(LOCAL_PATH)/libcrypto_utils.tar.gz)
+RMDIRS += $(shell rm -rf $(LOCAL_PATH)/tmp)
 
-ifneq ($(libcrypto_utils_prepare),)
-$(shell rm $(LOCAL_PATH)/libcrypto_utils.tar.gz)
-$(shell rm -rf $(LOCAL_PATH)/tmp)
 libcrypto_utils_prepare := $(mktmp) $(getit) $(untgzit)
-endif
+needs_remove := falase
+
+ifeq ($(libcrypto_utils_prepare),)
 
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libcrypto_utils_static
 LOCAL_MODULE_HOST_OS := $(HOST_OS)
-LOCAL_SRC_FILES := tmp/android_pubkey.c
+LOCAL_SRC_FILES := $(libcrypto_utils_prepare)  tmp/android_pubkey.c
 LOCAL_CFLAGS := -Wall -Werror -Wextra -std=c99
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/tmp/include/
 LOCAL_EXPORT_C_INCLUDES := $(LOCAL_C_INCLUDES)
@@ -457,13 +456,20 @@ LOCAL_STATIC_LIBRARIES := libcrypto_static
 include $(BUILD_HOST_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
+LOCAL_SRC_FILES := $(libcrypto_utils_prepare)  tmp/android_pubkey.c
 LOCAL_MODULE := libcrypto_utils_static
-LOCAL_SRC_FILES := tmp/android_pubkey.c
 LOCAL_CFLAGS := -Wall -Werror -Wextra -std=c99
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/tmp/include/
 LOCAL_EXPORT_C_INCLUDES := $(LOCAL_C_INCLUDES)
 LOCAL_STATIC_LIBRARIES := libcrypto_static
 include $(BUILD_STATIC_LIBRARY)
+endif
+
+ifneq ($(needs_remove),)
+
+rmdirs := $(RMDIRS)
+include $(rmdirs)
+endif
 
 # adbd device daemon
 # =========================================================
