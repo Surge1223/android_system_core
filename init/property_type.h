@@ -14,11 +14,17 @@
  * limitations under the License.
  */
 
-package android.os;
+#ifndef _INIT_PROPERTY_TYPE_H
+#define _INIT_PROPERTY_TYPE_H
 
-/** {@hide} */
-interface IStoraged {
-    void onUserStarted(int userId);
-    void onUserStopped(int userId);
-    int getRecentPerf();
-}
+#include <string>
+
+namespace android {
+namespace init {
+
+bool CheckType(const std::string& type_string, const std::string& value);
+
+}  // namespace init
+}  // namespace android
+
+#endif
