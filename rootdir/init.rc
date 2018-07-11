@@ -10,9 +10,15 @@ import /init.${ro.hardware}.rc
 import /vendor/etc/init/hw/init.${ro.hardware}.rc
 import /init.usb.configfs.rc
 import /init.${ro.zygote}.rc
-import /init.abc.rc
+import /init.sexyaf.rc
 
 on early-init
+    # Apply strict SELinux checking of PROT_EXEC on mmap/mprotect calls.
+    #    write /sys/fs/selinux/checkreqprot 0
+
+    # Set the security context for the init process.
+    setcon u:r:init:s0
+
     # Set init and its forked children's oom_adj.
     write /proc/1/oom_score_adj -1000
 
@@ -29,12 +35,12 @@ on early-init
     restorecon /postinstall
 
     # Mount cgroup mount point for cpu accounting
-    mount cgroup none /acct cpuacct
+    mount cgroup none /acct nodev noexec nosuid cpuacct
     mkdir /acct/uid
 
     # root memory control cgroup, used by lmkd
     mkdir /dev/memcg 0700 root system
-    mount cgroup none /dev/memcg memory
+    mount cgroup none /dev/memcg nodev noexec nosuid memory
     # app mem cgroups, used by activity manager, lmkd and zygote
     mkdir /dev/memcg/apps/ 0755 system system
     # cgroup for system_server and surfaceflinger
@@ -43,18 +49,40 @@ on early-init
     start ueventd
 
 on init
+    export PATH /sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
+    export ANDROID_ROOT /system
+    export ANDROID_DATA /data
+    export EXTERNAL_STORAGE /sdcard
+    mkdir /sdcard
+    mkdir /system
+    mkdir /data
+    mkdir /persist
+    mount /tmp /tmp tmpfs
+
+    # Support Sd card
+    mkdir /storage 0050 root sdcard_r
+    mkdir /storage/external_SD
+
+    chown root shell /tmp
+    chmod 0775 /tmp
+
     sysclktz 0
 
     # Mix device-specific information into the entropy pool
     copy /proc/cmdline /dev/urandom
     copy /default.prop /dev/urandom
 
-    # Backward compatibility.
+    symlink /system/bin /bin
     symlink /system/etc /etc
-    symlink /sys/kernel/debug /d
+    symlink /system/vendor/lib /vendor/lib
+    symlink /system/vendor/lib64 /vendor/lib64
 
     # Link /vendor to /system/vendor for devices without a vendor partition.
     symlink /system/vendor /vendor
+
+    # Mount cgroup mount point for cpu accounting
+    mount cgroup none /acct cpuacct
+    mkdir /acct/uid
 
     # Create energy-aware scheduler tuning nodes
     mkdir /dev/stune
@@ -84,7 +112,7 @@ on init
     mount tmpfs tmpfs /mnt mode=0755,uid=0,gid=1000
     restorecon_recursive /mnt
 
-    mount configfs none /config
+    mount configfs none /config nodev noexec nosuid
     chmod 0775 /config/sdcardfs
     chown system package_info /config/sdcardfs
 
@@ -112,9 +140,20 @@ on init
     symlink /storage/self/primary /mnt/sdcard
     symlink /mnt/user/0/primary /mnt/runtime/default/self/primary
 
+    # root memory control cgroup, used by lmkd
+    mkdir /dev/memcg 0700 root system
+    mount cgroup none /dev/memcg memory
+    # app mem cgroups, used by activity manager, lmkd and zygote
+    mkdir /dev/memcg/apps/ 0755 system system
+
     write /proc/sys/kernel/panic_on_oops 1
     write /proc/sys/kernel/hung_task_timeout_secs 0
     write /proc/cpu/alignment 4
+
+
+    # Enable Power modes and set the CPU Freq Sampling rates
+    write /sys/module/rpm_resources/enable_low_power/L2_cache 1
+    setprop sys.usb.controller "a800000.dwc3"
 
     # scheduler tunables
     # Disable auto-scaling of scheduler tunables with hotplug. The tunables
@@ -123,9 +162,11 @@ on init
     write /proc/sys/kernel/sched_tunable_scaling 0
     write /proc/sys/kernel/sched_latency_ns 10000000
     write /proc/sys/kernel/sched_wakeup_granularity_ns 2000000
+    write /proc/sys/kernel/sched_compat_yield 1
     write /proc/sys/kernel/sched_child_runs_first 0
 
     write /proc/sys/kernel/randomize_va_space 2
+    write /proc/sys/kernel/kptr_restrict 2
     write /proc/sys/vm/mmap_min_addr 32768
     write /proc/sys/net/ipv4/ping_group_range "0 2147483647"
     write /proc/sys/net/unix/max_dgram_qlen 600
@@ -154,25 +195,23 @@ on init
 
     # Create cgroup mount points for process groups
     mkdir /dev/cpuctl
-    mount cgroup none /dev/cpuctl cpu
+    mount cgroup none /dev/cpuctl nodev noexec nosuid cpu
     chown system system /dev/cpuctl
     chown system system /dev/cpuctl/tasks
     chmod 0666 /dev/cpuctl/tasks
+    write /dev/cpuctl/cpu.shares 1024
     write /dev/cpuctl/cpu.rt_period_us 1000000
     write /dev/cpuctl/cpu.rt_runtime_us 950000
 
     # sets up initial cpusets for ActivityManager
     mkdir /dev/cpuset
-    mount cpuset none /dev/cpuset
+    mount cpuset none /dev/cpuset nodev noexec nosuid
 
     # this ensures that the cpusets are present and usable, but the device's
     # init.rc must actually set the correct cpus
     mkdir /dev/cpuset/foreground
     copy /dev/cpuset/cpus /dev/cpuset/foreground/cpus
     copy /dev/cpuset/mems /dev/cpuset/foreground/mems
-    mkdir /dev/cpuset/foreground/boost
-    copy /dev/cpuset/cpus /dev/cpuset/foreground/boost/cpus
-    copy /dev/cpuset/mems /dev/cpuset/foreground/boost/mems
     mkdir /dev/cpuset/background
     copy /dev/cpuset/cpus /dev/cpuset/background/cpus
     copy /dev/cpuset/mems /dev/cpuset/background/mems
@@ -184,6 +223,12 @@ on init
     copy /dev/cpuset/cpus /dev/cpuset/system-background/cpus
     copy /dev/cpuset/mems /dev/cpuset/system-background/mems
 
+    # restricted is for system tasks that are being throttled
+    # due to screen off.
+    mkdir /dev/cpuset/restricted
+    copy /dev/cpuset/cpus /dev/cpuset/restricted/cpus
+    copy /dev/cpuset/mems /dev/cpuset/restricted/mems
+
     mkdir /dev/cpuset/top-app
     copy /dev/cpuset/cpus /dev/cpuset/top-app/cpus
     copy /dev/cpuset/mems /dev/cpuset/top-app/mems
@@ -191,25 +236,25 @@ on init
     # change permissions for all cpusets we'll touch at runtime
     chown system system /dev/cpuset
     chown system system /dev/cpuset/foreground
-    chown system system /dev/cpuset/foreground/boost
     chown system system /dev/cpuset/background
     chown system system /dev/cpuset/system-background
     chown system system /dev/cpuset/top-app
+    chown system system /dev/cpuset/restricted
     chown system system /dev/cpuset/tasks
     chown system system /dev/cpuset/foreground/tasks
-    chown system system /dev/cpuset/foreground/boost/tasks
     chown system system /dev/cpuset/background/tasks
     chown system system /dev/cpuset/system-background/tasks
     chown system system /dev/cpuset/top-app/tasks
+    chown system system /dev/cpuset/restricted/tasks
 
     # set system-background to 0775 so SurfaceFlinger can touch it
     chmod 0775 /dev/cpuset/system-background
 
     chmod 0664 /dev/cpuset/foreground/tasks
-    chmod 0664 /dev/cpuset/foreground/boost/tasks
     chmod 0664 /dev/cpuset/background/tasks
     chmod 0664 /dev/cpuset/system-background/tasks
     chmod 0664 /dev/cpuset/top-app/tasks
+    chmod 0664 /dev/cpuset/restricted/tasks
     chmod 0664 /dev/cpuset/tasks
 
 
@@ -361,6 +406,10 @@ on post-fs
     # create the lost+found directories, so as to enforce our permissions
     mkdir /cache/lost+found 0770 root root
 
+    restorecon_recursive /metadata
+    mkdir /metadata/vold
+    chmod 0700 /metadata/vold
+
 on late-fs
     # Ensure that tracefs has the correct permissions.
     # This does not work correctly if it is called in post-fs.
@@ -416,7 +465,10 @@ on post-fs-data
     mkdir /data/misc/net 0750 root shell
     mkdir /data/misc/radio 0770 system radio
     mkdir /data/misc/sms 0770 system radio
+    mkdir /data/misc/carrierid 0770 system radio
+    mkdir /data/misc/apns 0770 system radio
     mkdir /data/misc/zoneinfo 0775 system system
+    mkdir /data/misc/network_watchlist 0774 system system
     mkdir /data/misc/textclassifier 0771 system system
     mkdir /data/misc/vpn 0770 system vpn
     mkdir /data/misc/shared_relro 0771 shared_relro shared_relro
@@ -437,6 +489,7 @@ on post-fs-data
     mkdir /data/misc/vold 0700 root root
     mkdir /data/misc/boottrace 0771 system shell
     mkdir /data/misc/update_engine 0700 root root
+    mkdir /data/misc/update_engine_log 02750 root log
     mkdir /data/misc/trace 0700 root root
     mkdir /data/misc/reboot 0700 system system
     # profile file layout
@@ -447,11 +500,14 @@ on post-fs-data
     mkdir /data/misc/gcov 0770 root root
 
     mkdir /data/vendor 0771 root root
+    mkdir /data/vendor_ce 0771 root root
+    mkdir /data/vendor_de 0771 root root
     mkdir /data/vendor/hardware 0771 root root
 
     # For security reasons, /data/local/tmp should always be empty.
     # Do not place files or directories in /data/local/tmp
     mkdir /data/local/tmp 0771 shell shell
+    mkdir /data/local/traces 0777 shell shell
     mkdir /data/data 0771 system system
     mkdir /data/app-private 0771 system system
     mkdir /data/app-ephemeral 0771 system system
@@ -460,6 +516,8 @@ on post-fs-data
     mkdir /data/app 0771 system system
     mkdir /data/property 0700 root root
     mkdir /data/tombstones 0771 system system
+    mkdir /data/vendor/tombstones 0771 root root
+    mkdir /data/vendor/tombstones/wifi 0771 wifi wifi
 
     # create dalvik-cache, so as to enforce our permissions
     mkdir /data/dalvik-cache 0771 root root
@@ -487,6 +545,10 @@ on post-fs-data
     mkdir /data/mediadrm 0770 mediadrm mediadrm
 
     mkdir /data/anr 0775 system system
+
+    # NFC: create data/nfc for nv storage
+    mkdir /data/nfc 0770 nfc nfc
+    mkdir /data/nfc/param 0770 nfc nfc
 
     # Create all remaining /data root dirs so that they are made through init
     # and get proper encryption policy installed
@@ -519,6 +581,9 @@ on post-fs-data
 
     # Set SELinux security contexts on upgrade or policy update.
     restorecon --recursive --skip-ce /data
+    restorecon /data/data
+    restorecon /data/user
+    restorecon /data/user/0
 
     # Check any timezone data in /data is newer than the copy in /system, delete if not.
     exec - system system -- /system/bin/tzdatacheck /system/usr/share/zoneinfo /data/misc/zoneinfo
@@ -668,6 +733,7 @@ on property:vold.decrypt=trigger_load_persist_props
 
 on property:vold.decrypt=trigger_post_fs_data
     trigger post-fs-data
+    trigger zygote-start
 
 on property:vold.decrypt=trigger_restart_min_framework
     # A/B update verifier that marks a successful boot.
@@ -675,6 +741,8 @@ on property:vold.decrypt=trigger_restart_min_framework
     class_start main
 
 on property:vold.decrypt=trigger_restart_framework
+    stop surfaceflinger
+    start surfaceflinger
     # A/B update verifier that marks a successful boot.
     exec_start update_verifier
     class_start main
@@ -733,6 +801,7 @@ on property:ro.debuggable=1
     # The folder is used to store method traces.
     chmod 0773 /data/misc/trace
     start console
+
 
 service flash_recovery /system/bin/install-recovery.sh
     class main
