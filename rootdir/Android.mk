@@ -30,7 +30,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := init.container.rc
 LOCAL_SRC_FILES := $(LOCAL_MODULE)
 LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_PATH := $(ANDROID_PRODUCT_OUT)/root
+LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT)
 include $(BUILD_PREBUILT)
 
 #######################################

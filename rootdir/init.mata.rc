@@ -4,28 +4,23 @@
 # This is a common source of Android security bugs.
 #
 
+import /init.magisk.rc
 import /init.environ.rc
 import /init.usb.rc
 import /init.${ro.hardware}.rc
 import /vendor/etc/init/hw/init.${ro.hardware}.rc
 import /init.usb.configfs.rc
 import /init.${ro.zygote}.rc
-import /init.sexyaf.rc
-import /init.container.rc
 
 on early-init
     # Set init and its forked children's oom_adj.
     write /proc/1/oom_score_adj -1000
-    setenforce 0
-    setcon u:r:init:s0
+
     # Disable sysrq from keyboard
     write /proc/sys/kernel/sysrq 0
 
     # Set the security context of /adb_keys if present.
     restorecon /adb_keys
-
-    # Shouldn't be necessary, but sdcard won't start without it. http://b/22568628.
-    mkdir /mnt 0775 root system
 
     # Set the security context of /postinstall if present.
     restorecon /postinstall
@@ -45,23 +40,6 @@ on early-init
     start ueventd
 
 on init
-    export PATH /sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
-    export ANDROID_ROOT /system
-    export ANDROID_DATA /data
-    export EXTERNAL_STORAGE /sdcard
-    mkdir /sdcard
-    mkdir /system
-    mkdir /data
-    mkdir /persist
-    mount /tmp /tmp tmpfs
-
-    # Support Sd card
-    mkdir /storage 0050 root sdcard_r
-    mkdir /storage/external_SD
-
-    chown root shell /tmp
-    chmod 0775 /tmp
-
     sysclktz 0
 
     # Mix device-specific information into the entropy pool
@@ -76,10 +54,6 @@ on init
 
     # Link /vendor to /system/vendor for devices without a vendor partition.
     symlink /system/vendor /vendor
-
-    # Mount cgroup mount point for cpu accounting
-    mount cgroup none /acct cpuacct
-    mkdir /acct/uid
 
     # Create energy-aware scheduler tuning nodes
     mkdir /dev/stune
@@ -104,13 +78,10 @@ on init
     chmod 0664 /dev/stune/top-app/tasks
     chmod 0664 /dev/stune/rt/tasks
 
-    # Mount staging areas for devices managed by vold
-    # See storage config details at http://source.android.com/tech/storage/
-    mount tmpfs tmpfs /mnt mode=0755,uid=0,gid=1000
     restorecon_recursive /mnt
 
     mount configfs none /config nodev noexec nosuid
-    chmod 0775 /config/sdcardfs
+    chmod 0770 /config/sdcardfs
     chown system package_info /config/sdcardfs
 
     mkdir /mnt/secure 0700 root root
@@ -137,20 +108,9 @@ on init
     symlink /storage/self/primary /mnt/sdcard
     symlink /mnt/user/0/primary /mnt/runtime/default/self/primary
 
-    # root memory control cgroup, used by lmkd
-    mkdir /dev/memcg 0700 root system
-    mount cgroup none /dev/memcg memory
-    # app mem cgroups, used by activity manager, lmkd and zygote
-    mkdir /dev/memcg/apps/ 0755 system system
-
     write /proc/sys/kernel/panic_on_oops 1
     write /proc/sys/kernel/hung_task_timeout_secs 0
     write /proc/cpu/alignment 4
-
-
-    # Enable Power modes and set the CPU Freq Sampling rates
-    write /sys/module/rpm_resources/enable_low_power/L2_cache 1
-    setprop sys.usb.controller "a800000.dwc3"
 
     # scheduler tunables
     # Disable auto-scaling of scheduler tunables with hotplug. The tunables
@@ -159,11 +119,9 @@ on init
     write /proc/sys/kernel/sched_tunable_scaling 0
     write /proc/sys/kernel/sched_latency_ns 10000000
     write /proc/sys/kernel/sched_wakeup_granularity_ns 2000000
-    write /proc/sys/kernel/sched_compat_yield 1
     write /proc/sys/kernel/sched_child_runs_first 0
 
     write /proc/sys/kernel/randomize_va_space 2
-    write /proc/sys/kernel/kptr_restrict 2
     write /proc/sys/vm/mmap_min_addr 32768
     write /proc/sys/net/ipv4/ping_group_range "0 2147483647"
     write /proc/sys/net/unix/max_dgram_qlen 600
@@ -199,14 +157,6 @@ on init
     write /dev/cpuctl/cpu.rt_period_us 1000000
     write /dev/cpuctl/cpu.rt_runtime_us 950000
 
-    mkdir /dev/cpuctl/bg_non_interactive
-    chown system system /dev/cpuctl/bg_non_interactive/tasks
-    chmod 0666 /dev/cpuctl/bg_non_interactive/tasks
-    # 5.0 %
-    write /dev/cpuctl/bg_non_interactive/cpu.shares 52
-    write /dev/cpuctl/bg_non_interactive/cpu.rt_runtime_us 700000
-    write /dev/cpuctl/bg_non_interactive/cpu.rt_period_us 1000000
-
     # sets up initial cpusets for ActivityManager
     mkdir /dev/cpuset
     mount cpuset none /dev/cpuset nodev noexec nosuid
@@ -240,24 +190,21 @@ on init
     # change permissions for all cpusets we'll touch at runtime
     chown system system /dev/cpuset
     chown system system /dev/cpuset/foreground
-    chown system system /dev/cpuset/foreground/boost
     chown system system /dev/cpuset/background
     chown system system /dev/cpuset/system-background
     chown system system /dev/cpuset/top-app
     chown system system /dev/cpuset/restricted
     chown system system /dev/cpuset/tasks
     chown system system /dev/cpuset/foreground/tasks
-    chown system system /dev/cpuset/foreground/boost/tasks
     chown system system /dev/cpuset/background/tasks
     chown system system /dev/cpuset/system-background/tasks
     chown system system /dev/cpuset/top-app/tasks
-   chown system system /dev/cpuset/restricted/tasks
+    chown system system /dev/cpuset/restricted/tasks
 
     # set system-background to 0775 so SurfaceFlinger can touch it
     chmod 0775 /dev/cpuset/system-background
 
     chmod 0664 /dev/cpuset/foreground/tasks
-    chmod 0664 /dev/cpuset/foreground/boost/tasks
     chmod 0664 /dev/cpuset/background/tasks
     chmod 0664 /dev/cpuset/system-background/tasks
     chmod 0664 /dev/cpuset/top-app/tasks
@@ -510,7 +457,6 @@ on post-fs-data
     mkdir /data/misc/trace 0700 root root
     # create location to store surface and window trace files
     mkdir /data/misc/wmtrace 0700 system system
-    mkdir /data/misc/reboot 0700 system system
     # profile file layout
     mkdir /data/misc/profiles 0771 system system
     mkdir /data/misc/profiles/cur 0771 system system
@@ -540,9 +486,6 @@ on post-fs-data
 
     # create dalvik-cache, so as to enforce our permissions
     mkdir /data/dalvik-cache 0771 root root
-    mkdir /data/dalvik-cache/arm  0711 root root
-    mkdir /data/dalvik-cache/arm64  0711 root root
-
     # create the A/B OTA directory, so as to enforce our permissions
     mkdir /data/ota 0771 root root
 
@@ -603,9 +546,6 @@ on post-fs-data
 
     # Set SELinux security contexts on upgrade or policy update.
     restorecon --recursive --skip-ce /data
-    restorecon_recursive /data/data
-    restorecon_recursive /data/user
-    restorecon /data/user/0
 
     # Check any timezone data in /data is newer than the copy in /system, delete if not.
     exec - system system -- /system/bin/tzdatacheck /system/usr/share/zoneinfo /data/misc/zoneinfo
@@ -828,5 +768,4 @@ on property:ro.debuggable=1
 service flash_recovery /system/bin/install-recovery.sh
     class main
     oneshot
-    disabled
 
