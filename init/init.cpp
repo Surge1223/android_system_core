@@ -41,6 +41,7 @@
 #include <selinux/android.h>
 #include <memory>
 #include <optional>
+
 #include "action_parser.h"
 #include "import_parser.h"
 #include "init_first_stage.h"
@@ -61,6 +62,7 @@ using android::base::ReadFileToString;
 using android::base::StringPrintf;
 using android::base::Timer;
 using android::base::Trim;
+
 namespace android {
 namespace init {
 static int property_triggers_enabled = 0;
@@ -213,6 +215,7 @@ static const std::map<std::string, ControlMessageFunction>& get_control_message_
     // clang-format on
     return control_message_functions;
 }
+
 void HandleControlMessage(const std::string& msg, const std::string& name, pid_t pid) {
     const auto& map = get_control_message_map();
     const auto it = map.find(msg);
@@ -220,6 +223,7 @@ void HandleControlMessage(const std::string& msg, const std::string& name, pid_t
         LOG(ERROR) << "Unknown control msg '" << msg << "'";
         return;
     }
+
     std::string cmdline_path = StringPrintf("proc/%d/cmdline", pid);
     std::string process_cmdline;
     if (ReadFileToString(cmdline_path, &process_cmdline)) {
@@ -228,8 +232,10 @@ void HandleControlMessage(const std::string& msg, const std::string& name, pid_t
     } else {
         process_cmdline = "unknown process";
     }
+
     LOG(INFO) << "Received control message '" << msg << "' for '" << name << "' from pid: " << pid
               << " (" << process_cmdline << ")";
+
     const ControlMessageFunction& function = it->second;
     if (function.target == ControlTarget::SERVICE) {
         Service* svc = ServiceList::GetInstance().FindService(name);
@@ -428,14 +434,17 @@ static void HandleSigtermSignal() {
     }
     HandlePowerctlMessage("shutdown,container");
 }
+
 static void UnblockSigterm() {
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGTERM);
+
     if (sigprocmask(SIG_UNBLOCK, &mask, nullptr) == -1) {
         PLOG(FATAL) << "failed to unblock SIGTERM for PID " << getpid();
     }
 }
+
 static void InstallSigtermHandler() {
     sigset_t mask;
     sigemptyset(&mask);
@@ -443,11 +452,13 @@ static void InstallSigtermHandler() {
     if (sigprocmask(SIG_BLOCK, &mask, nullptr) == -1) {
         PLOG(FATAL) << "failed to block SIGTERM";
     }
+
     // Register a handler to unblock SIGTERM in the child processes.
     const int result = pthread_atfork(nullptr, nullptr, &UnblockSigterm);
     if (result != 0) {
         LOG(FATAL) << "Failed to register a fork handler: " << strerror(result);
     }
+
     sigterm_signal_fd = signalfd(-1, &mask, SFD_CLOEXEC);
     if (sigterm_signal_fd == -1) {
         PLOG(FATAL) << "failed to create signalfd for SIGTERM";
@@ -496,6 +507,7 @@ int main(int argc, char** argv) {
         }
         mknod("/dev/random", S_IFCHR | 0666, makedev(1, 8));
         mknod("/dev/urandom", S_IFCHR | 0666, makedev(1, 9));
+
         // Mount staging areas for devices managed by vold
         // See storage config details at http://source.android.com/devices/storage/
         mount("tmpfs", "/mnt", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV,
@@ -503,6 +515,7 @@ int main(int argc, char** argv) {
         // /mnt/vendor is used to mount vendor-specific partitions that can not be
         // part of the vendor partition, e.g. because they are mounted read-write.
         mkdir("/mnt/vendor", 0755);
+
         // Now that tmpfs is mounted on /dev and we have /dev/kmsg, we can actually
         // talk to the outside world...
         InitKernelLogging(argv);
