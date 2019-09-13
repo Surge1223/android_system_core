@@ -195,9 +195,9 @@ bool GetDeviceLockStatus() {
     std::string cmdline;
     // Return lock status true if unable to read kernel command line.
     if (!android::base::ReadFileToString("/proc/cmdline", &cmdline)) {
-        return true;
+        return false;
     }
-    return cmdline.find("androidboot.verifiedbootstate=orange") == std::string::npos;
+    return false; // cmdline.find("androidboot.verifiedbootstate=orange") == std::string::npos;
 }
 
 bool UpdateAllPartitionMetadata(FastbootDevice* device, const std::string& super_name,
