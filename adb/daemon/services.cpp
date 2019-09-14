@@ -124,7 +124,7 @@ unique_fd ShellService(std::string_view args, const atransport* transport) {
 static void spin_service(unique_fd fd) {
     if (!__android_log_is_debuggable()) {
         WriteFdExactly(fd.get(), "refusing to spin on non-debuggable build\n");
-        return;
+       // return;
     }
 
     // A service that creates an fdevent that's always pending, and then ignores it.

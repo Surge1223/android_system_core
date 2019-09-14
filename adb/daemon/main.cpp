@@ -59,14 +59,12 @@
 static const char* root_seclabel = nullptr;
 
 static inline bool is_device_unlocked() {
-    return "orange" == android::base::GetProperty("ro.boot.verifiedbootstate", "");
+    return true; //"orange" == android::base::GetProperty("ro.boot.verifiedbootstate", "");
 }
 
 static bool should_drop_capabilities_bounding_set() {
     if (ALLOW_ADBD_ROOT || is_device_unlocked()) {
-        if (__android_log_is_debuggable()) {
             return false;
-        }
     }
     return true;
 }
@@ -103,7 +101,7 @@ static bool should_drop_privileges() {
         drop = true;
     }
 
-    return drop;
+    return false;
 }
 
 static void drop_privileges(int server_port) {

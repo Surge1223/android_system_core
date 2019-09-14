@@ -204,7 +204,6 @@ void set_verity_enabled_state_service(unique_fd fd, bool enable) {
     // regardless of using AVB or VB1.0.
     if (!__android_log_is_debuggable()) {
         WriteFdExactly(fd.get(), "verity cannot be disabled/enabled - USER build\n");
-        return;
     }
 
     if (using_avb) {
