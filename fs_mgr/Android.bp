@@ -75,7 +75,7 @@ cc_library {
         "libfstab",
     ],
     cppflags: [
-        "-DALLOW_ADBD_DISABLE_VERITY=0",
+        "-DALLOW_ADBD_DISABLE_VERITY=1",
     ],
     product_variables: {
         debuggable: {
@@ -132,7 +132,7 @@ cc_binary {
         "fs_mgr_remount.cpp",
     ],
     cppflags: [
-        "-DALLOW_ADBD_DISABLE_VERITY=0",
+        "-DALLOW_ADBD_DISABLE_VERITY=1",
     ],
     product_variables: {
         debuggable: {

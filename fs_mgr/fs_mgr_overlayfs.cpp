@@ -171,7 +171,7 @@ bool fs_mgr_overlayfs_enabled(FstabEntry* entry) {
         has_shared_blocks = true;
     }
     errno = save_errno;
-    return has_shared_blocks;
+    return false;
 }
 
 bool fs_mgr_rm_all(const std::string& path, bool* change = nullptr, int level = 0) {
@@ -636,7 +636,7 @@ bool fs_mgr_overlayfs_make_scratch(const std::string& scratch_device, const std:
     if (mnt_type == "f2fs") {
         command = kMkF2fs + " -w 4096 -f -d1 -l" + android::base::Basename(kScratchMountPoint);
     } else if (mnt_type == "ext4") {
-        command = kMkExt4 + " -F -b 4096 -t ext4 -m 0 -O has_journal -M " + kScratchMountPoint;
+        command = kMkExt4 + " -F -b 4096 -t ext4 -m 0  -O ^metadata_csum -O ^has_journal -M " + kScratchMountPoint;
     } else {
         errno = ESRCH;
         LERROR << mnt_type << " has no mkfs cookbook";
@@ -788,9 +788,9 @@ bool fs_mgr_overlayfs_invalid() {
     // in recovery, fastbootd, or gsi mode, not allowed!
     if (fs_mgr_access("/system/bin/recovery")) return true;
     auto save_errno = errno;
-    auto ret = android::gsi::IsGsiRunning();
+//    auto ret = android::gsi::IsGsiRunning();
     errno = save_errno;
-    return ret;
+    return true;
 }
 
 }  // namespace

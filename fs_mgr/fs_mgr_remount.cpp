@@ -165,7 +165,6 @@ int main(int argc, char* argv[]) {
     // Make sure we are root.
     if (::getuid() != 0) {
         LOG(ERROR) << "must be run as root";
-        return NOT_ROOT;
     }
 
     // Read the selected fstab.
@@ -307,12 +306,12 @@ int main(int argc, char* argv[]) {
         ++it;
     }
 
-    if (partitions.empty()) {
+/*    if (partitions.empty()) {
         if (reboot_later) reboot(false);
         LOG(WARNING) << "No partitions to remount";
         return retval;
     }
-
+*/
     // Mount overlayfs.
     errno = 0;
     if (!fs_mgr_overlayfs_mount_all(&partitions) && errno) {
